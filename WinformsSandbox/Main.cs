@@ -48,12 +48,15 @@ public partial class Main : Form
         base.CreateHandle();
         _ = Task.Run(() =>
         {
-            var client = GetSandboxClient();
             BeginInvoke(async () =>
             {
-                if (client == null)
+                try
                 {
-                    Controls.Add(new Label { Text = "The Windows Sandbox API is not available.", AutoSize = true, Padding = new Padding(10) });
+                    GetSandboxClient();
+                }
+                catch (Exception ex)
+                {
+                    Controls.Add(new Label { Text = $"The Windows Sandbox API is not available. {ex.Message}", AutoSize = true, Padding = new Padding(10) });
                     return;
                 }
 
@@ -108,54 +111,47 @@ public partial class Main : Form
         _rdpClient.Connect();
     }
 
-    private ClientProxy? GetSandboxClient()
+    private void GetSandboxClient()
     {
-        try
+        var pm = new PackageManager();
+        var packageName = "Windows Sandbox";
+        var package = pm.FindPackagesForUser(string.Empty).FirstOrDefault(p => p.DisplayName == packageName);
+        if (package == null)
+            throw new Exception($"Cannot find '{packageName}' package.");
+
+        var file = Path.Combine(package.InstalledPath, "SandboxCommon.dll");
+        if (!File.Exists(file))
+            throw new Exception($"Cannot find '{file}' file.");
+
+        var bytes = File.ReadAllBytes(file);
+        var asm = Assembly.Load(bytes);
+        var typeName = "SandboxCommon.Grpc.GrpcClient";
+        var clientType = asm.GetType(typeName);
+        if (clientType == null)
+            throw new Exception($"Cannot find '{typeName}' type.");
+
+        // resolve all dlls from the package
+        AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
         {
-            var pm = new PackageManager();
-            var package = pm.FindPackagesForUser(string.Empty).FirstOrDefault(p => p.DisplayName == "Windows Sandbox");
-            if (package == null)
-                return null;
+            var name = e.Name.Split(',')[0] + ".dll";
+            var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.FullName == e.Name);
+            if (assembly != null)
+                return assembly;
 
-            var file = Path.Combine(package.InstalledPath, "SandboxCommon.dll");
-            if (!File.Exists(file))
-                return null;
-
-            var bytes = File.ReadAllBytes(file);
-            var asm = Assembly.Load(bytes);
-            var clientType = asm.GetType("SandboxCommon.Grpc.GrpcClient");
-            if (clientType == null)
-                return null;
-
-            // resolve all dlls from the package
-            AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
+            var file = Path.Combine(package.InstalledPath, name);
+            if (File.Exists(file))
             {
-                var name = e.Name.Split(',')[0] + ".dll";
-                var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.FullName == e.Name);
-                if (assembly != null)
-                    return assembly;
-
-                var file = Path.Combine(package.InstalledPath, name);
-                if (File.Exists(file))
-                {
-                    var bytes = File.ReadAllBytes(file);
-                    var asm = Assembly.Load(bytes);
-                    return asm;
-                }
-                return null;
-            };
-
-            if (Activator.CreateInstance(clientType, [null]) is not IDisposable client)
-                return null;
-
-            _grpcClient = new ClientProxy(client);
-            return _grpcClient;
-        }
-        catch
-        {
-            // unknown things can happen
+                var bytes = File.ReadAllBytes(file);
+                var asm = Assembly.Load(bytes);
+                return asm;
+            }
             return null;
-        }
+        };
+
+        if (Activator.CreateInstance(clientType, [null]) is not IDisposable client)
+            throw new Exception($"Cannot find create instance of '{clientType.FullName}' type.");
+
+        _grpcClient = new ClientProxy(client);
     }
 
     // reflection-built proxies, we could use the SandboxCommon.dll directly too.
