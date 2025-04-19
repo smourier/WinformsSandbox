@@ -80,7 +80,7 @@ public partial class Main : Form
             var size = ClientSize;
             if (_rdpClient.Connected == 1)
             {
-                var ocx = (IMsRdpClient9)_rdpClient.GetOcx();
+                var ocx = (IMsRdpClient9)_rdpClient.GetOcx()!;
                 ocx.UpdateSessionDisplaySettings((uint)size.Width, (uint)size.Height, (uint)size.Width, (uint)size.Height, 0u, 100, 100);
             }
             else
@@ -115,10 +115,7 @@ public partial class Main : Form
     {
         var pm = new PackageManager();
         var packageName = "Windows Sandbox";
-        var package = pm.FindPackagesForUser(string.Empty).FirstOrDefault(p => p.DisplayName == packageName);
-        if (package == null)
-            throw new Exception($"Cannot find '{packageName}' package.");
-
+        var package = pm.FindPackagesForUser(string.Empty).FirstOrDefault(p => p.DisplayName == packageName) ?? throw new Exception($"Cannot find '{packageName}' package.");
         var file = Path.Combine(package.InstalledPath, "SandboxCommon.dll");
         if (!File.Exists(file))
             throw new Exception($"Cannot find '{file}' file.");
@@ -126,9 +123,7 @@ public partial class Main : Form
         var bytes = File.ReadAllBytes(file);
         var asm = Assembly.Load(bytes);
         var typeName = "SandboxCommon.Grpc.GrpcClient";
-        var clientType = asm.GetType(typeName);
-        if (clientType == null)
-            throw new Exception($"Cannot find '{typeName}' type.");
+        var clientType = asm.GetType(typeName) ?? throw new Exception($"Cannot find '{typeName}' type.");
 
         // resolve all dlls from the package
         AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
@@ -271,6 +266,8 @@ public partial class Main : Form
         [DllImport("RdpBase")]
         private static extern int RDPBASE_CreateInstance(nint platformContext, in Guid rclsid, in Guid riid, [MarshalAs(UnmanagedType.IUnknown)] out object obj);
 
+#pragma warning disable IDE0079 // Remove unnecessary suppression
+#pragma warning disable SYSLIB1096 // Convert to 'GeneratedComInterface'
         [ComImport, Guid("4ACF942D-EADC-45bf-8EA8-793FE3CE31E8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         private interface IRDPENCNamedPipeDirectConnector
         {
@@ -287,7 +284,9 @@ public partial class Main : Form
         [ComImport, Guid("FB332AE7-000E-4208-92B7-20410CA8382B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         private interface IRDPENCPlatformContext
         {
+#pragma warning disable IDE1006 // Naming Styles
             void _VtblGap0_9(); // skip 9 methods
+#pragma warning restore IDE1006 // Naming Styles
             int InitializeInstance();
         }
 
@@ -300,5 +299,7 @@ public partial class Main : Form
             [PreserveSig]
             void OnConnectorError(int hr);
         }
+#pragma warning restore SYSLIB1096 // Convert to 'GeneratedComInterface'
     }
+#pragma warning restore IDE0079 // Remove unnecessary suppression
 }
