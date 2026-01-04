@@ -10,7 +10,7 @@ using System.Runtime.Versioning;
 
 [assembly: AssemblyTitle("WinformsSandbox")]
 [assembly: AssemblyProduct("Winforms Sandbox")]
-[assembly: AssemblyCopyright("Copyright (C) 2024-2025 Simon Mourier. All rights reserved.")]
+[assembly: AssemblyCopyright("Copyright (C) 2024-2026 Simon Mourier. All rights reserved.")]
 [assembly: AssemblyCulture("")]
 [assembly: AssemblyDescription("Windows Sandbox Programmatically used from .NET Core Windows Forms")]
 [assembly: AssemblyCompany("Simon Mourier")]
